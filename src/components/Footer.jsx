@@ -7,9 +7,12 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="col-span-1 md:col-span-2">
-            <h3 className="text-lg font-semibold text-indigo-600 mb-4">CertifyPro</h3>
+            <h3 className="text-lg font-semibold text-indigo-600 mb-4">
+              CertifyPro
+            </h3>
             <p className="text-gray-500 max-w-md">
-              Create professional certificates instantly. Perfect for courses, achievements, and events.
+              Create professional certificates instantly. Perfect for courses,
+              achievements, and events.
             </p>
           </div>
 
@@ -20,17 +23,58 @@ const Footer = () => {
             </h4>
             <ul className="space-y-4">
               <li>
-                <a href="#features" className="text-gray-500 hover:text-gray-900">
+                <a
+                  href="#features"
+                  className="text-gray-500 hover:text-gray-900"
+                >
                   Features
                 </a>
               </li>
               <li>
-                <a href="#templates" className="text-gray-500 hover:text-gray-900">
+                <a
+                  href="#templates"
+                  className="text-gray-500 hover:text-gray-900"
+                >
                   Templates
                 </a>
               </li>
               <li>
-                <a href="#pricing" className="text-gray-500 hover:text-gray-900">
+                <a
+                  href="#pricing"
+                  className="text-gray-500 hover:text-gray-900"
+                >
+                  Pricing
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#pricing"
+                  className="text-gray-500 hover:text-gray-900"
+                >
+                  Pricing
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#pricing"
+                  className="text-gray-500 hover:text-gray-900"
+                >
+                  Pricing
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#pricing"
+                  className="text-gray-500 hover:text-gray-900"
+                >
+                  Pricing
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#pricing"
+                  className="text-gray-500 hover:text-gray-900"
+                >
                   Pricing
                 </a>
               </li>
@@ -49,7 +93,10 @@ const Footer = () => {
                 </a>
               </li>
               <li>
-                <a href="#privacy" className="text-gray-500 hover:text-gray-900">
+                <a
+                  href="#privacy"
+                  className="text-gray-500 hover:text-gray-900"
+                >
                   Privacy Policy
                 </a>
               </li>
