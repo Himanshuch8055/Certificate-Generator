@@ -1,49 +1,51 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { auth } from '../config/firebase';
 import { 
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword, 
+  signOut,
+  onAuthStateChanged
 } from 'firebase/auth';
+import { auth } from '../config/firebase';
 
-const AuthContext = createContext({});
+const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
+export function AuthProvider({ children }) {
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Sign up function
+  async function signup(email, password) {
+    return createUserWithEmailAndPassword(auth, email, password);
+  }
+
+  // Login function
+  async function login(email, password) {
+    return signInWithEmailAndPassword(auth, email, password);
+  }
+
+  // Logout function
+  async function logout() {
+    return signOut(auth);
+  }
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+      setCurrentUser(user);
       setLoading(false);
     });
 
     return unsubscribe;
   }, []);
 
-  const signIn = async (email, password) => {
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      console.error('Sign in error:', error.message);
-      throw error;
-    }
-  };
-
-  const signOut = async () => {
-    try {
-      await firebaseSignOut(auth);
-    } catch (error) {
-      console.error('Sign out error:', error.message);
-      throw error;
-    }
-  };
-
   const value = {
-    user,
-    signIn,
-    signOut,
-    loading
+    currentUser,
+    signup,
+    login,
+    logout
   };
 
   return (
@@ -51,12 +53,4 @@ export const AuthProvider = ({ children }) => {
       {!loading && children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}; 
+} 

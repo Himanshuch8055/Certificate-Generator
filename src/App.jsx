@@ -1,10 +1,15 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { Suspense } from 'react';
-import { routes } from './routes/routes.config';
-import RouteGuard from './components/RouteGuard';
-import LoadingSpinner from './components/ui/LoadingSpinner';
-import { AnimatePresence } from 'framer-motion';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useLocation,
+} from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import { Suspense } from "react";
+import { routes } from "./routes/routes.config";
+import RouteGuard from "./components/RouteGuard";
+import LoadingSpinner from "./components/ui/LoadingSpinner";
+import { AnimatePresence } from "framer-motion";
 
 // Create AnimatedRoutes component for page transitions
 const AnimatedRoutes = () => {

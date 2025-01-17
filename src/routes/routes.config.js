@@ -10,7 +10,9 @@ const ProfileSettings = lazy(() => import('../pages/ProfileSettings'));
 const TemplateManager = lazy(() => import('../pages/TemplateManager'));
 const TemplateMarketplace = lazy(() => import('../pages/TemplateMarketplace'));
 const VerifyCertificate = lazy(() => import('../pages/VerifyCertificate'));
+const AboutUs = lazy(() => import('../pages/AboutUs'));
 const NotFound = lazy(() => import('../pages/NotFound'));
+const AnimatedPage = lazy(() => import('../pages/AnimatedPage'));
 
 export const routes = [
   {
@@ -56,6 +58,16 @@ export const routes = [
   {
     path: '/verify/:certificateId',
     element: VerifyCertificate,
+    isPublic: true,
+  },
+  {
+    path: '/about',
+    element: AboutUs,
+    isPublic: true,
+  },
+  {
+    path: '/animated',
+    element: AnimatedPage,
     isPublic: true,
   },
   {

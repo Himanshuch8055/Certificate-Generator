@@ -12,16 +12,21 @@ const Login = () => {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    
     try {
-      console.log('Attempting login...');
       setError('');
       setLoading(true);
       await login(email, password);
-      console.log('Login successful!');
       navigate('/');
     } catch (error) {
       console.error('Login error:', error);
-      setError(error.message);
+      setError(
+        error.code === 'auth/user-not-found' 
+          ? 'No account found with this email' 
+          : error.code === 'auth/wrong-password'
+          ? 'Incorrect password'
+          : 'Failed to log in'
+      );
     } finally {
       setLoading(false);
     }
