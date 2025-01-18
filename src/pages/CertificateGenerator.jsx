@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import CertificateForm from '../components/CertificateForm';
 import CertificatePreview from '../components/CertificatePreview';
 import TemplateSelector from '../components/TemplateSelector';
@@ -8,14 +8,29 @@ import StatusBadge from '../components/StatusBadge';
 import PageLayout from '../components/layout/PageLayout';
 import PageHeader from '../components/ui/PageHeader';
 import { generateCertificateId } from '../utils/helpers';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { sendCertificateEmail } from '../services/emailService';
 import CertificateHistory from '../components/CertificateHistory';
 import CertificateComments from '../components/CertificateComments';
 import CertificateTags from '../components/CertificateTags';
+import { useNavigate } from 'react-router-dom';
+import { doc, setDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from '../config/firebase';
+import { useAuth } from '../context/AuthContext';
+import html2canvas from 'html2canvas';
+import { v4 as uuidv4 } from 'uuid';
+import { Transition } from '@headlessui/react';
+import { Monitor, Tablet, Phone, Copy, Save, Send, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const CertificateGenerator = () => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const previewRef = useRef(null);
+  const [saving, setSaving] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+
   // Enhanced state management
   const [formData, setFormData] = useState(() => ({
     recipientName: '',
@@ -33,7 +48,6 @@ const CertificateGenerator = () => {
 
   const [isSaving, setIsSaving] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
-  const [previewMode, setPreviewMode] = useState('desktop');
   const [showShareModal, setShowShareModal] = useState(false);
 
   const [history, setHistory] = useState([
@@ -83,22 +97,66 @@ const CertificateGenerator = () => {
     }));
   }, []);
 
+  // Function to capture preview as image
+  const capturePreview = async () => {
+    if (previewRef.current) {
+      const canvas = await html2canvas(previewRef.current);
+      return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+          resolve(blob);
+        }, 'image/png');
+      });
+    }
+    return null;
+  };
+
+  // Enhanced save function with preview image
   const handleSave = async () => {
     if (!formData.recipientName || !formData.courseName) {
       alert('Please fill in all required fields');
       return;
     }
 
-    setIsSaving(true);
+    setSaving(true);
     try {
-      // Save logic here
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Capture preview image
+      const previewBlob = await capturePreview();
+      
+      // Upload preview to Storage
+      const storage = getStorage();
+      const previewPath = `certificates/${currentUser.uid}/${formData.certificateId}/preview.png`;
+      const previewRef = ref(storage, previewPath);
+      await uploadBytes(previewRef, previewBlob);
+      const previewUrl = await getDownloadURL(previewRef);
+
+      // Save certificate data to Firestore
+      const certificateRef = doc(db, 'certificates', formData.certificateId);
+      await setDoc(certificateRef, {
+        ...formData,
+        previewUrl,
+        userId: currentUser.uid,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: 'active'
+      });
+
+      // Send email if recipient email is provided
+      if (formData.recipientEmail) {
+        await sendCertificateEmail({
+          recipientEmail: formData.recipientEmail,
+          recipientName: formData.recipientName,
+          certificateId: formData.certificateId,
+          courseName: formData.courseName,
+          previewUrl
+        });
+      }
+
       setShowShareModal(true);
     } catch (error) {
       console.error('Error saving certificate:', error);
       alert('Failed to save certificate');
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
@@ -158,149 +216,161 @@ const CertificateGenerator = () => {
     }]);
   };
 
+  // Function to duplicate template
+  const handleDuplicate = () => {
+    const newId = uuidv4();
+    setFormData(prev => ({
+      ...prev,
+      certificateId: newId,
+      recipientName: '',
+      recipientEmail: ''
+    }));
+  };
+
   return (
     <PageLayout>
-      <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
-        <PageHeader
-          title="Create Certificate"
-          description="Design and customize your professional certificate"
-          action={
-            <div className="flex items-center space-x-4">
-              <StatusBadge 
-                status={formData.status} 
-                expirationDate={formData.expirationDate}
-              />
-              <button
-                onClick={handleSendEmail}
-                disabled={isSaving}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                Send Email
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          }
-        />
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8">
 
-        {/* Mobile Stepper */}
-        {isMobile && (
-          <div className="mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                {steps.map((step, index) => (
-                  <button
-                    key={step.id}
-                    onClick={() => setActiveStep(index)}
-                    className={`
-                      whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-                      ${activeStep === index
-                        ? 'border-indigo-500 text-indigo-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }
-                    `}
+          {/* Main Content with Enhanced Grid Layout */}
+          <div className="mt-6 pb-24 sm:pb-0">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              {/* Left Panel - Design Tools */}
+              <AnimatePresence mode="wait">
+                {(!isMobile || activeStep !== 2) && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="xl:col-span-7 space-y-6"
                   >
-                    {step.name}
-                  </button>
-                ))}
-              </nav>
+                    {(!isMobile || activeStep === 0) && (
+                      <div className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Choose Template</h3>
+                        <TemplateSelector
+                          selectedTemplate={formData.selectedTemplate}
+                          onChange={handleTemplateChange}
+                        />
+                      </div>
+                    )}
+                    
+                    {(!isMobile || activeStep === 1) && (
+                      <>
+                        <div className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+                          <h3 className="text-lg font-medium text-gray-900 mb-4">Certificate Details</h3>
+                          <CertificateForm
+                            formData={formData}
+                            onChange={handleFormUpdate}
+                          />
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+                          <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Options</h3>
+                          <div className="space-y-6">
+                            <ExpirationManager
+                              onExpirationSet={handleExpirationSet}
+                              currentDate={formData.expirationDate}
+                            />
+                            <CertificateTags
+                              tags={tags}
+                              onAddTag={handleAddTag}
+                              onRemoveTag={handleRemoveTag}
+                              suggestions={['Course', 'Achievement', 'Training', 'Workshop']}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Right Panel - Preview and Details */}
+              <AnimatePresence mode="wait">
+                {(!isMobile || activeStep === 2) && (
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.3 }}
+                    className="xl:col-span-5 space-y-6"
+                  >
+                    {/* Certificate Preview */}
+                    <div ref={previewRef} className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+                      <CertificatePreview
+                        formData={formData}
+                      />
+                    </div>
+
+                    {/* Additional Details */}
+                    {(!isMobile || activeStep === 2) && (
+                      <>
+                        <ShareCertificate
+                          certificateId={formData.certificateId}
+                          recipientName={formData.recipientName}
+                          courseName={formData.courseName}
+                          previewUrl={previewImage}
+                        />
+                        <CertificateHistory history={history} />
+                        <CertificateComments
+                          comments={comments}
+                          onAddComment={handleAddComment}
+                          currentUser={currentUser}
+                        />
+                      </>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-        )}
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Left Panel - Design Tools */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className={`lg:col-span-7 space-y-6 ${isMobile && activeStep === 2 ? 'hidden' : ''}`}
-          >
-            <div className="sticky top-6 space-y-6">
-              {(!isMobile || activeStep === 0) && (
-                <TemplateSelector
-                  selectedTemplate={formData.selectedTemplate}
-                  onChange={handleTemplateChange}
-                />
-              )}
-              
-              {(!isMobile || activeStep === 1) && (
-                <>
-                  <CertificateForm
-                    formData={formData}
-                    onChange={handleFormUpdate}
-                    className="bg-white rounded-lg shadow-lg p-6"
-                  />
-                  <ExpirationManager
-                    onExpirationSet={handleExpirationSet}
-                  />
-                  <CertificateTags
-                    tags={tags}
-                    onAddTag={handleAddTag}
-                    onRemoveTag={handleRemoveTag}
-                  />
-                </>
-              )}
-            </div>
-          </motion.div>
-
-          {/* Right Panel - Preview and Details */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className={`lg:col-span-5 ${isMobile && activeStep !== 2 ? 'hidden' : ''}`}
-          >
-            <div className="lg:sticky lg:top-6 space-y-6">
-              <CertificatePreview
-                formData={formData}
-                previewMode={previewMode}
-              />
-              {(!isMobile || activeStep === 2) && (
-                <>
-                  <ShareCertificate
-                    certificateId={formData.certificateId}
-                    recipientName={formData.recipientName}
-                    courseName={formData.courseName}
-                  />
-                  <CertificateHistory history={history} />
-                  <CertificateComments
-                    comments={comments}
-                    onAddComment={handleAddComment}
-                  />
-                </>
-              )}
-            </div>
-          </motion.div>
+          {/* Enhanced Mobile Navigation */}
+          {isMobile && (
+            <motion.div
+              initial={{ y: 100 }}
+              animate={{ y: 0 }}
+              className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg backdrop-blur-sm bg-white/90"
+            >
+              <div className="flex justify-between items-center max-w-md mx-auto">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setActiveStep(Math.max(0, activeStep - 1))}
+                  disabled={activeStep === 0}
+                  className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-50 transition-colors duration-200"
+                >
+                  <ChevronLeft className="h-5 w-5 mr-1" />
+                  Previous
+                </motion.button>
+                <div className="flex space-x-2">
+                  {[0, 1, 2].map((idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={false}
+                      animate={{
+                        backgroundColor: idx === activeStep ? '#4F46E5' : '#E5E7EB',
+                        scale: idx === activeStep ? 1.2 : 1
+                      }}
+                      className="h-1.5 w-4 rounded-full"
+                    />
+                  ))}
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setActiveStep(Math.min(2, activeStep + 1))}
+                  disabled={activeStep === 2}
+                  className="flex items-center px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50 transition-colors duration-200"
+                >
+                  Next
+                  <ChevronRight className="h-5 w-5 ml-1" />
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
         </div>
-
-        {/* Mobile Navigation */}
-        {isMobile && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-            <div className="flex justify-between">
-              <button
-                onClick={() => setActiveStep(Math.max(0, activeStep - 1))}
-                disabled={activeStep === 0}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setActiveStep(Math.min(2, activeStep + 1))}
-                disabled={activeStep === 2}
-                className="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </PageLayout>
   );
